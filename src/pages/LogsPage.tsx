@@ -43,7 +43,7 @@ const LogsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   
   // Mock data for the frontend demo
   const mockLogs: LogEntry[] = [
@@ -131,7 +131,7 @@ const LogsPage: React.FC = () => {
         );
       }
       
-      if (statusFilter) {
+      if (statusFilter && statusFilter !== 'all') {
         filteredLogs = filteredLogs.filter(log => 
           log.status === statusFilter
         );
@@ -296,7 +296,7 @@ const LogsPage: React.FC = () => {
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All statuses</SelectItem>
+                      <SelectItem value="all">All statuses</SelectItem>
                       <SelectItem value="awake">Awake</SelectItem>
                       <SelectItem value="drowsy">Drowsy</SelectItem>
                       <SelectItem value="sleeping">Sleeping</SelectItem>

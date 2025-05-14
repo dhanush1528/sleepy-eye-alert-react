@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Eye, AlertTriangle, Sleep } from 'lucide-react';
+import { Eye, AlertTriangle, Moon } from 'lucide-react';
 
 type StatusType = 'awake' | 'drowsy' | 'sleeping';
 
@@ -37,7 +37,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
   const iconMap = {
     awake: <Eye className="mr-1.5" size={size === 'lg' ? 18 : size === 'md' ? 16 : 14} />,
     drowsy: <AlertTriangle className="mr-1.5" size={size === 'lg' ? 18 : size === 'md' ? 16 : 14} />,
-    sleeping: <Sleep className="mr-1.5" size={size === 'lg' ? 18 : size === 'md' ? 16 : 14} />,
+    sleeping: <Moon className="mr-1.5" size={size === 'lg' ? 18 : size === 'md' ? 16 : 14} />,
   };
   
   return (
