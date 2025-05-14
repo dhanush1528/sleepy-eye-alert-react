@@ -21,6 +21,30 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Roboflow API for Drowsiness Detection
+export const RoboflowAPI = {
+  // Detect drowsiness from image data
+  detectDrowsiness: async (imageData: string) => {
+    try {
+      const response = await axios({
+        method: "POST",
+        url: "https://serverless.roboflow.com/drosiness-detection/3",
+        params: {
+          api_key: "315aOgfnEMnRwYmSo03L"
+        },
+        data: imageData,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error in drowsiness detection API:", error);
+      throw error;
+    }
+  }
+};
+
 // Detection API
 export const DetectionAPI = {
   // Send detection status to backend

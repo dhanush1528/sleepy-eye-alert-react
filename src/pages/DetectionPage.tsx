@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { toast } from '@/components/ui/use-toast';
-import { DetectionAPI } from '@/lib/api';
+import { DetectionAPI, RoboflowAPI } from '@/lib/api';
 import { AuthAPI } from '@/lib/api';
 import { Play, Square, Clock, AlertTriangle, Activity, Eye, Moon, Camera, Cpu, Shield, Volume2 } from 'lucide-react';
 
@@ -15,6 +15,17 @@ import { Play, Square, Clock, AlertTriangle, Activity, Eye, Moon, Camera, Cpu, S
 const alertSound = new Audio('/alert.mp3');
 
 type DetectionStatus = 'awake' | 'drowsy' | 'sleeping' | 'inactive';
+
+// Interface for API response
+interface DrowsinessDetectionResponse {
+  eye_status: string;
+  mouth_status: string;
+  sleep_status: string;
+  ear_value: number;
+  mar_value: number;
+  head_angle: number;
+  drowsy: boolean;
+}
 
 const DetectionPage: React.FC = () => {
   const webcamRef = useRef<Webcam>(null);
@@ -25,9 +36,10 @@ const DetectionPage: React.FC = () => {
   const [sessionTime, setSessionTime] = useState(0);
   const [drowsyEvents, setDrowsyEvents] = useState(0);
   const [sleepEvents, setSleepEvents] = useState(0);
+  const [detectionResponse, setDetectionResponse] = useState<DrowsinessDetectionResponse | null>(null);
   
-  // For simulating detection in this frontend-only version
-  const simulationIntervalRef = useRef<number | null>(null);
+  // Refs for interval handling
+  const detectionIntervalRef = useRef<number | null>(null);
   const sessionIntervalRef = useRef<number | null>(null);
 
   const webcamWidth = 640;
@@ -57,53 +69,77 @@ const DetectionPage: React.FC = () => {
     return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
   
-  // Simulate detection status changes
-  // In a real app, this would be replaced with actual ML detection
-  const simulateDetection = useCallback(() => {
-    const statuses: DetectionStatus[] = ['awake', 'drowsy', 'sleeping'];
-    const weights = [0.7, 0.2, 0.1]; // Probability weights
+  // Capture image from webcam and send to API
+  const captureAndDetect = useCallback(async () => {
+    if (!webcamRef.current || !isDetecting) return;
     
-    const randomIndex = (() => {
-      const r = Math.random();
-      let sum = 0;
-      for (let i = 0; i < weights.length; i++) {
-        sum += weights[i];
-        if (r < sum) return i;
+    try {
+      // Capture image from webcam as base64
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        console.error("Failed to capture image from webcam");
+        return;
       }
-      return 0;
-    })();
-    
-    const newStatus = statuses[randomIndex];
-    setStatus(newStatus);
-    
-    // Count drowsy and sleep events
-    if (newStatus === 'drowsy') {
-      setDrowsyEvents(prev => prev + 1);
-    } else if (newStatus === 'sleeping') {
-      setSleepEvents(prev => prev + 1);
-    }
-    
-    // Play alert sound for drowsy or sleeping
-    if (newStatus === 'drowsy' || newStatus === 'sleeping') {
-      if (newStatus === 'sleeping') {
-        alertSound.play().catch(e => console.error("Error playing alert:", e));
-        
-        toast({
-          title: "Alert!",
-          description: "You appear to be sleeping! Please take a break.",
-          variant: "destructive",
-        });
+      
+      // Remove data URL prefix to get just the base64 data
+      const base64Data = imageSrc.split(',')[1];
+      
+      // Send to Roboflow API
+      const response = await RoboflowAPI.detectDrowsiness(base64Data);
+      console.log("Drowsiness detection response:", response);
+      
+      setDetectionResponse(response);
+      
+      // Determine status based on API response
+      let newStatus: DetectionStatus = 'awake';
+      
+      if (response.drowsy === true) {
+        if (response.sleep_status === "Slept" || response.eye_status === "Closed") {
+          newStatus = 'sleeping';
+        } else {
+          newStatus = 'drowsy';
+        }
       }
+      
+      // Update status
+      setStatus(newStatus);
+      
+      // Count drowsy and sleep events
+      if (newStatus === 'drowsy' && status !== 'drowsy') {
+        setDrowsyEvents(prev => prev + 1);
+      } else if (newStatus === 'sleeping' && status !== 'sleeping') {
+        setSleepEvents(prev => prev + 1);
+      }
+      
+      // Play alert sound for drowsy or sleeping
+      if (newStatus === 'drowsy' || newStatus === 'sleeping') {
+        if (newStatus === 'sleeping') {
+          alertSound.play().catch(e => console.error("Error playing alert:", e));
+          
+          toast({
+            title: "Alert!",
+            description: "You appear to be sleeping! Please take a break.",
+            variant: "destructive",
+          });
+        }
+      }
+      
+      // Save detection to backend if authenticated
+      if (AuthAPI.isAuthenticated()) {
+        DetectionAPI.saveDetection(newStatus, new Date())
+          .catch(error => {
+            console.error('Error saving detection:', error);
+          });
+      }
+    } catch (error) {
+      console.error("Error during drowsiness detection:", error);
+      toast({
+        title: "Detection Error",
+        description: "Failed to process drowsiness detection. Please try again.",
+        variant: "destructive",
+      });
     }
-    
-    // Save detection to backend if authenticated
-    if (AuthAPI.isAuthenticated()) {
-      DetectionAPI.saveDetection(newStatus, new Date())
-        .catch(error => {
-          console.error('Error saving detection:', error);
-        });
-    }
-  }, []);
+  }, [isDetecting, status]);
   
   // Start detection
   const startDetection = useCallback(() => {
@@ -121,6 +157,7 @@ const DetectionPage: React.FC = () => {
     setSessionTime(0);
     setDrowsyEvents(0);
     setSleepEvents(0);
+    setDetectionResponse(null);
     
     // Start session timer
     if (sessionIntervalRef.current) {
@@ -131,30 +168,30 @@ const DetectionPage: React.FC = () => {
       setSessionTime(prev => prev + 1);
     }, 1000);
     
-    // For demo purposes, we'll simulate detection
-    // In a real app, you would process webcam frames with ML here
-    if (simulationIntervalRef.current) {
-      clearInterval(simulationIntervalRef.current);
+    // Start detection at intervals
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
     }
     
-    simulationIntervalRef.current = window.setInterval(() => {
-      simulateDetection();
+    // Run detection every 3 seconds
+    detectionIntervalRef.current = window.setInterval(() => {
+      captureAndDetect();
     }, 3000);
     
     toast({
       title: "Detection Started",
       description: "Drowsiness detection is now active.",
     });
-  }, [webcamReady, simulateDetection]);
+  }, [webcamReady, captureAndDetect]);
   
   // Stop detection
   const stopDetection = useCallback(() => {
     setIsDetecting(false);
     setStatus('inactive');
     
-    if (simulationIntervalRef.current) {
-      clearInterval(simulationIntervalRef.current);
-      simulationIntervalRef.current = null;
+    if (detectionIntervalRef.current) {
+      clearInterval(detectionIntervalRef.current);
+      detectionIntervalRef.current = null;
     }
     
     if (sessionIntervalRef.current) {
@@ -171,8 +208,8 @@ const DetectionPage: React.FC = () => {
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      if (simulationIntervalRef.current) {
-        clearInterval(simulationIntervalRef.current);
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current);
       }
       if (sessionIntervalRef.current) {
         clearInterval(sessionIntervalRef.current);
@@ -392,6 +429,40 @@ const DetectionPage: React.FC = () => {
                         {getStatusDescription(status)}
                       </p>
                     </div>
+                    
+                    {/* Detection Details */}
+                    {detectionResponse && isDetecting && (
+                      <div className="border-t border-white/10 pt-5 mt-5">
+                        <p className="text-sm font-medium mb-3 text-gray-400 flex items-center">
+                          <Eye className="mr-2 text-blue-400" size={16} />
+                          Detection Details:
+                        </p>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between bg-black/30 p-2 rounded-lg border border-white/5">
+                            <span className="text-gray-400">Eye Status:</span>
+                            <span className={detectionResponse.eye_status === "Open" ? "text-green-300" : "text-red-300"}>
+                              {detectionResponse.eye_status}
+                            </span>
+                          </div>
+                          <div className="flex justify-between bg-black/30 p-2 rounded-lg border border-white/5">
+                            <span className="text-gray-400">Mouth Status:</span>
+                            <span className={detectionResponse.mouth_status === "Not Yawning" ? "text-green-300" : "text-amber-300"}>
+                              {detectionResponse.mouth_status}
+                            </span>
+                          </div>
+                          <div className="flex justify-between bg-black/30 p-2 rounded-lg border border-white/5">
+                            <span className="text-gray-400">Sleep Status:</span>
+                            <span className={detectionResponse.sleep_status === "Not Slept" ? "text-green-300" : "text-red-300"}>
+                              {detectionResponse.sleep_status}
+                            </span>
+                          </div>
+                          <div className="flex justify-between bg-black/30 p-2 rounded-lg border border-white/5">
+                            <span className="text-gray-400">Head Angle:</span>
+                            <span className="text-blue-300">{detectionResponse.head_angle.toFixed(1)}°</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="border-t border-white/10 pt-5 mt-5">
                       <p className="text-sm font-medium mb-4 text-gray-400 flex items-center">
