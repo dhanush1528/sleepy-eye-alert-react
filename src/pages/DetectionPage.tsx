@@ -9,7 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { toast } from '@/components/ui/use-toast';
 import { DetectionAPI } from '@/lib/api';
 import { AuthAPI } from '@/lib/api';
-import { Play, Square, Clock, AlertTriangle, Activity } from 'lucide-react';
+import { Play, Square, Clock, AlertTriangle, Activity, Eye, Moon, Camera, Cpu, Shield, Volume2 } from 'lucide-react';
 
 // Alert sound
 const alertSound = new Audio('/alert.mp3');
@@ -22,9 +22,13 @@ const DetectionPage: React.FC = () => {
   const [status, setStatus] = useState<DetectionStatus>('inactive');
   const [webcamReady, setWebcamReady] = useState(false);
   const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [sessionTime, setSessionTime] = useState(0);
+  const [drowsyEvents, setDrowsyEvents] = useState(0);
+  const [sleepEvents, setSleepEvents] = useState(0);
   
   // For simulating detection in this frontend-only version
   const simulationIntervalRef = useRef<number | null>(null);
+  const sessionIntervalRef = useRef<number | null>(null);
 
   const webcamWidth = 640;
   const webcamHeight = 480;
@@ -45,6 +49,14 @@ const DetectionPage: React.FC = () => {
     });
   }, []);
   
+  // Format session time
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+  
   // Simulate detection status changes
   // In a real app, this would be replaced with actual ML detection
   const simulateDetection = useCallback(() => {
@@ -63,6 +75,13 @@ const DetectionPage: React.FC = () => {
     
     const newStatus = statuses[randomIndex];
     setStatus(newStatus);
+    
+    // Count drowsy and sleep events
+    if (newStatus === 'drowsy') {
+      setDrowsyEvents(prev => prev + 1);
+    } else if (newStatus === 'sleeping') {
+      setSleepEvents(prev => prev + 1);
+    }
     
     // Play alert sound for drowsy or sleeping
     if (newStatus === 'drowsy' || newStatus === 'sleeping') {
@@ -99,6 +118,18 @@ const DetectionPage: React.FC = () => {
     
     setIsDetecting(true);
     setStatus('awake');
+    setSessionTime(0);
+    setDrowsyEvents(0);
+    setSleepEvents(0);
+    
+    // Start session timer
+    if (sessionIntervalRef.current) {
+      clearInterval(sessionIntervalRef.current);
+    }
+    
+    sessionIntervalRef.current = window.setInterval(() => {
+      setSessionTime(prev => prev + 1);
+    }, 1000);
     
     // For demo purposes, we'll simulate detection
     // In a real app, you would process webcam frames with ML here
@@ -126,6 +157,11 @@ const DetectionPage: React.FC = () => {
       simulationIntervalRef.current = null;
     }
     
+    if (sessionIntervalRef.current) {
+      clearInterval(sessionIntervalRef.current);
+      sessionIntervalRef.current = null;
+    }
+    
     toast({
       title: "Detection Stopped",
       description: "Drowsiness detection has been deactivated.",
@@ -138,6 +174,9 @@ const DetectionPage: React.FC = () => {
       if (simulationIntervalRef.current) {
         clearInterval(simulationIntervalRef.current);
       }
+      if (sessionIntervalRef.current) {
+        clearInterval(sessionIntervalRef.current);
+      }
     };
   }, []);
   
@@ -145,15 +184,15 @@ const DetectionPage: React.FC = () => {
   const renderWebcamStatus = () => {
     if (webcamError) {
       return (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 backdrop-blur-sm rounded-lg">
-          <div className="text-center p-6 glass-card rounded-xl">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-lg">
+          <div className="text-center p-6 futuristic-card rounded-xl">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-            <p className="text-red-500 font-medium mb-2">Webcam Error</p>
-            <p className="text-sm text-gray-600">{webcamError}</p>
+            <p className="text-red-400 font-medium mb-2">Webcam Error</p>
+            <p className="text-sm text-gray-400">{webcamError}</p>
             <Button 
               variant="outline" 
               size="sm" 
-              className="mt-4 button-hover-effect"
+              className="mt-4 neon-button"
               onClick={() => window.location.reload()}
             >
               Retry
@@ -165,11 +204,11 @@ const DetectionPage: React.FC = () => {
     
     if (!webcamReady) {
       return (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 backdrop-blur-sm rounded-lg">
-          <div className="text-center glass-card p-6 rounded-xl">
-            <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-gray-600 mb-2">Initializing webcam...</p>
-            <p className="text-xs text-gray-500">Please allow camera access when prompted</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-lg">
+          <div className="text-center futuristic-card p-6 rounded-xl">
+            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-3"></div>
+            <p className="text-blue-400 mb-2">Initializing webcam...</p>
+            <p className="text-xs text-gray-400">Please allow camera access when prompted</p>
           </div>
         </div>
       );
@@ -178,17 +217,37 @@ const DetectionPage: React.FC = () => {
     return null;
   };
   
+  // Get status color for animations
+  const getStatusColor = (status: DetectionStatus) => {
+    switch (status) {
+      case 'awake': return 'text-green-400';
+      case 'drowsy': return 'text-amber-400';
+      case 'sleeping': return 'text-red-400';
+      default: return 'text-gray-400';
+    }
+  };
+  
+  // Get status description
+  const getStatusDescription = (status: DetectionStatus) => {
+    switch (status) {
+      case 'awake': return 'You are alert and focused. Keep up the good work!';
+      case 'drowsy': return 'Warning: You are showing signs of drowsiness! Consider taking a break.';
+      case 'sleeping': return 'Alert: You appear to be falling asleep! Stop what you are doing immediately.';
+      default: return 'Start detection to monitor drowsiness levels.';
+    }
+  };
+  
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-2 gradient-text animate-fade-in">Drowsiness Detection</h1>
-          <p className="text-gray-600 mb-6 animate-fade-in delay-100">Begin monitoring to detect signs of drowsiness in real-time.</p>
+          <h1 className="text-3xl font-bold mb-2 futuristic-text animate-fade-in">Drowsiness Detection</h1>
+          <p className="text-gray-400 mb-6 animate-fade-in delay-100">Begin monitoring to detect signs of drowsiness in real-time.</p>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Webcam Preview */}
             <div className="lg:col-span-2 animate-fade-in delay-200">
-              <Card className="glass-card overflow-hidden">
+              <Card className="futuristic-card overflow-hidden border-2 border-white/5">
                 <CardContent className="p-4">
                   <div className="webcam-container relative">
                     <Webcam
@@ -217,20 +276,30 @@ const DetectionPage: React.FC = () => {
 
                     {isDetecting && (
                       <div className="absolute top-3 right-3">
-                        <div className="flex items-center rounded-full bg-red-500/20 backdrop-blur-sm px-3 py-1.5 text-sm text-red-600 font-medium">
+                        <div className="flex items-center rounded-full backdrop-blur-lg bg-black/40 border border-red-500/20 px-3 py-1.5 text-sm text-red-400 font-medium">
                           <div className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse"></div>
-                          Monitoring
+                          LIVE
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Scanning overlay when detecting */}
+                    {isDetecting && (
+                      <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50 animate-pulse"></div>
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50 animate-pulse delay-500"></div>
+                        <div className="absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-transparent via-blue-500 to-transparent opacity-50 animate-pulse delay-300"></div>
+                        <div className="absolute top-0 right-0 h-full w-1 bg-gradient-to-b from-transparent via-blue-500 to-transparent opacity-50 animate-pulse delay-700"></div>
                       </div>
                     )}
                   </div>
                   
-                  <div className="flex justify-center space-x-4 mt-6">
+                  <div className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4 mt-6">
                     {!isDetecting ? (
                       <Button 
                         onClick={startDetection} 
                         disabled={!webcamReady || !!webcamError}
-                        className="rounded-full button-hover-effect shadow-lg shadow-blue-500/20 px-6"
+                        className="neon-button w-full sm:w-auto rounded-full px-6 py-3 flex items-center justify-center"
                       >
                         <Play className="mr-2" size={18} />
                         Start Detection
@@ -239,7 +308,7 @@ const DetectionPage: React.FC = () => {
                       <Button 
                         variant="destructive" 
                         onClick={stopDetection}
-                        className="rounded-full button-hover-effect shadow-lg shadow-red-500/20 px-6"
+                        className="w-full sm:w-auto rounded-full px-6 py-3 flex items-center justify-center"
                       >
                         <Square className="mr-2" size={18} />
                         Stop Detection
@@ -248,57 +317,118 @@ const DetectionPage: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+              
+              {/* Detection Info Cards */}
+              <div className="grid grid-cols-3 gap-4 mt-4">
+                <Card className="futuristic-card animate-fade-in delay-300">
+                  <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <Camera className="text-blue-400 mb-2" size={24} />
+                    <h3 className="text-sm font-medium text-gray-300 mb-1">Camera Status</h3>
+                    <p className={`text-sm ${webcamReady ? 'text-green-400' : 'text-red-400'}`}>
+                      {webcamReady ? 'Connected' : 'Disconnected'}
+                    </p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="futuristic-card animate-fade-in delay-400">
+                  <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <Cpu className="text-purple-400 mb-2" size={24} />
+                    <h3 className="text-sm font-medium text-gray-300 mb-1">AI Status</h3>
+                    <p className={`text-sm ${isDetecting ? 'text-green-400' : 'text-gray-400'}`}>
+                      {isDetecting ? 'Active' : 'Inactive'}
+                    </p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="futuristic-card animate-fade-in delay-500">
+                  <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <Volume2 className="text-cyan-400 mb-2" size={24} />
+                    <h3 className="text-sm font-medium text-gray-300 mb-1">Alerts</h3>
+                    <p className="text-sm text-cyan-400">Enabled</p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
             
             {/* Status Panel */}
             <div className="animate-fade-in delay-400">
-              <Card className="glass-card h-full">
+              <Card className="futuristic-card h-full border-2 border-white/5">
                 <CardContent className="p-6">
-                  <h2 className="text-xl font-semibold mb-6 flex items-center gradient-text">
-                    <Activity className="mr-2" size={20} />
+                  <h2 className="text-xl font-semibold mb-6 flex items-center futuristic-text">
+                    <Activity className="mr-2 text-blue-400" size={20} />
                     Status Monitor
                   </h2>
                   
                   <div className="space-y-6">
                     <div>
-                      <p className="text-sm font-medium mb-3 text-gray-700">Current Status:</p>
+                      <p className="text-sm font-medium mb-3 text-gray-400">Current Status:</p>
                       
-                      <div className="p-6 rounded-lg glass-card mb-4 flex items-center justify-center h-24">
+                      <div className="p-6 rounded-lg futuristic-card mb-4 flex items-center justify-center h-24 border border-white/5">
                         {status === 'inactive' ? (
                           <span className="text-gray-500 flex items-center">
                             <Clock className="mr-2" /> Detection inactive
                           </span>
                         ) : (
-                          <StatusBadge status={status} size="lg" pulsing={status === 'drowsy' || status === 'sleeping'} />
+                          <div className="flex flex-col items-center">
+                            <StatusBadge status={status} size="lg" pulsing={status === 'drowsy' || status === 'sleeping'} />
+                            
+                            {isDetecting && (
+                              <div className="mt-2 flex space-x-1">
+                                {['awake', 'drowsy', 'sleeping'].map((s) => (
+                                  <div 
+                                    key={s} 
+                                    className={`w-2 h-2 rounded-full ${status === s ? 'animate-pulse' : 'opacity-30'} ${
+                                      s === 'awake' ? 'bg-green-500' : s === 'drowsy' ? 'bg-amber-500' : 'bg-red-500'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                       
-                      <p className="text-sm text-gray-600 italic">
-                        {status === 'awake' && 'You are alert and focused. Keep up the good work!'}
-                        {status === 'drowsy' && 'Warning: You are showing signs of drowsiness! Consider taking a break.'}
-                        {status === 'sleeping' && 'Alert: You appear to be falling asleep! Stop what you are doing immediately.'}
-                        {status === 'inactive' && 'Start detection to monitor drowsiness levels.'}
+                      <p className={`text-sm italic ${getStatusColor(status)}`}>
+                        {getStatusDescription(status)}
                       </p>
                     </div>
                     
-                    <div className="border-t border-gray-200/50 pt-5 mt-5">
-                      <p className="text-sm font-medium mb-4 text-gray-700 flex items-center">
-                        <Clock className="mr-2" size={16} />
+                    <div className="border-t border-white/10 pt-5 mt-5">
+                      <p className="text-sm font-medium mb-4 text-gray-400 flex items-center">
+                        <Clock className="mr-2 text-blue-400" size={16} />
                         Session Statistics:
                       </p>
                       <div className="space-y-3 text-sm">
-                        <div className="flex justify-between bg-gray-50/80 p-2 rounded-lg">
-                          <span className="text-gray-600">Session Duration:</span>
-                          <span className="font-medium">00:00:00</span>
+                        <div className="flex justify-between bg-black/30 p-2 rounded-lg border border-white/5">
+                          <span className="text-gray-400">Session Duration:</span>
+                          <span className="font-medium text-blue-300">{formatTime(sessionTime)}</span>
                         </div>
-                        <div className="flex justify-between bg-gray-50/80 p-2 rounded-lg">
-                          <span className="text-gray-600">Drowsy Events:</span>
-                          <span className="font-medium">0</span>
+                        <div className="flex justify-between bg-black/30 p-2 rounded-lg border border-white/5">
+                          <span className="text-gray-400">Drowsy Events:</span>
+                          <span className="font-medium text-amber-300">{drowsyEvents}</span>
                         </div>
-                        <div className="flex justify-between bg-gray-50/80 p-2 rounded-lg">
-                          <span className="text-gray-600">Sleep Events:</span>
-                          <span className="font-medium">0</span>
+                        <div className="flex justify-between bg-black/30 p-2 rounded-lg border border-white/5">
+                          <span className="text-gray-400">Sleep Events:</span>
+                          <span className="font-medium text-red-300">{sleepEvents}</span>
                         </div>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-white/10 pt-5 mt-5">
+                      <p className="text-sm font-medium mb-3 text-gray-400 flex items-center">
+                        <Shield className="mr-2 text-blue-400" size={16} />
+                        Alert Sensitivity:
+                      </p>
+                      <Slider
+                        defaultValue={[75]}
+                        max={100}
+                        step={1}
+                        className="my-4"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>Low</span>
+                        <span>Medium</span>
+                        <span>High</span>
                       </div>
                     </div>
                   </div>
@@ -308,8 +438,8 @@ const DetectionPage: React.FC = () => {
           </div>
           
           <div className="mt-8 text-center animate-fade-in delay-600">
-            <div className="glass-card inline-block p-4 rounded-xl">
-              <p className="text-sm text-gray-600">
+            <div className="futuristic-card inline-block p-4 rounded-xl border border-blue-500/20">
+              <p className="text-sm text-gray-400">
                 For optimal detection, make sure you are in a well-lit environment and your face is clearly visible.
               </p>
             </div>

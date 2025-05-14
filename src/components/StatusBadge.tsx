@@ -32,7 +32,13 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
     sleeping: "status-sleeping",
   };
   
-  const pulseClass = pulsing ? "animate-pulse-alert" : "";
+  const glowClasses = {
+    awake: "animate-glow-green",
+    drowsy: "animate-glow-orange",
+    sleeping: "animate-glow-red",
+  };
+  
+  const pulseClass = pulsing ? (status === "sleeping" ? "animate-pulse-alert" : glowClasses[status]) : "";
   
   const iconMap = {
     awake: <Eye className="mr-1.5" size={size === 'lg' ? 18 : size === 'md' ? 16 : 14} />,
