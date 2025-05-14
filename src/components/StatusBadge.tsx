@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Eye, AlertTriangle, Sleep } from 'lucide-react';
 
 type StatusType = 'awake' | 'drowsy' | 'sleeping';
 
@@ -17,21 +18,27 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
   size = 'md',
   className
 }) => {
-  const baseClasses = "inline-flex items-center justify-center font-medium rounded-full";
+  const baseClasses = "inline-flex items-center justify-center font-medium rounded-full transition-all duration-300";
   
   const sizeClasses = {
-    sm: "text-xs px-2 py-0.5",
-    md: "text-sm px-2.5 py-0.5",
-    lg: "text-base px-3 py-1",
+    sm: "text-xs px-2.5 py-1",
+    md: "text-sm px-3 py-1.5",
+    lg: "text-base px-4 py-2",
   };
   
   const statusClasses = {
-    awake: "bg-green-100 text-green-800 border border-green-200",
-    drowsy: "bg-amber-100 text-amber-800 border border-amber-200",
-    sleeping: "bg-red-100 text-red-800 border border-red-200",
+    awake: "status-awake",
+    drowsy: "status-drowsy",
+    sleeping: "status-sleeping",
   };
   
-  const pulseClass = pulsing ? "animate-pulse" : "";
+  const pulseClass = pulsing ? "animate-pulse-alert" : "";
+  
+  const iconMap = {
+    awake: <Eye className="mr-1.5" size={size === 'lg' ? 18 : size === 'md' ? 16 : 14} />,
+    drowsy: <AlertTriangle className="mr-1.5" size={size === 'lg' ? 18 : size === 'md' ? 16 : 14} />,
+    sleeping: <Sleep className="mr-1.5" size={size === 'lg' ? 18 : size === 'md' ? 16 : 14} />,
+  };
   
   return (
     <span className={cn(
@@ -41,12 +48,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
       pulseClass,
       className
     )}>
-      <span className={cn(
-        "w-2 h-2 rounded-full mr-1.5",
-        status === 'awake' && "bg-green-500",
-        status === 'drowsy' && "bg-amber-500",
-        status === 'sleeping' && "bg-red-500"
-      )} />
+      {iconMap[status]}
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
