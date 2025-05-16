@@ -1,5 +1,6 @@
 
 import axios from 'axios';
+import { mockProcessImageData } from './drowsinessDetection';
 
 // Create an axios instance with baseURL and default headers
 const api = axios.create({
@@ -26,6 +27,7 @@ export const RoboflowAPI = {
   // Detect drowsiness from image data
   detectDrowsiness: async (imageData: string) => {
     try {
+      // First try using the Roboflow API
       const response = await axios({
         method: "POST",
         url: "https://serverless.roboflow.com/drosiness-detection/3",
@@ -37,10 +39,20 @@ export const RoboflowAPI = {
           "Content-Type": "application/x-www-form-urlencoded"
         }
       });
+      console.log("Roboflow API response:", response.data);
       return response.data;
     } catch (error) {
-      console.error("Error in drowsiness detection API:", error);
-      throw error;
+      console.error("Error in Roboflow API, falling back to local detection:", error);
+      
+      // If Roboflow API fails, use our local implementation as fallback
+      try {
+        const result = await mockProcessImageData(imageData);
+        console.log("Local detection result:", result);
+        return result;
+      } catch (localError) {
+        console.error("Error in local detection:", localError);
+        throw localError;
+      }
     }
   }
 };

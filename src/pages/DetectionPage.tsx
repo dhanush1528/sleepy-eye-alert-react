@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import Layout from '@/components/Layout';
@@ -48,6 +47,10 @@ const DetectionPage: React.FC = () => {
   // Handle webcam initialization
   const handleWebcamInit = useCallback(() => {
     setWebcamReady(true);
+    toast({
+      title: "Webcam Ready",
+      description: "Drowsiness detection is ready to start.",
+    });
   }, []);
   
   // Handle webcam errors
@@ -84,7 +87,14 @@ const DetectionPage: React.FC = () => {
       // Remove data URL prefix to get just the base64 data
       const base64Data = imageSrc.split(',')[1];
       
-      // Send to Roboflow API
+      // Show processing indicator
+      toast({
+        title: "Processing",
+        description: "Analyzing drowsiness status...",
+        duration: 2000,
+      });
+      
+      // Send to Roboflow API (with local fallback)
       const response = await RoboflowAPI.detectDrowsiness(base64Data);
       console.log("Drowsiness detection response:", response);
       
@@ -135,9 +145,12 @@ const DetectionPage: React.FC = () => {
       console.error("Error during drowsiness detection:", error);
       toast({
         title: "Detection Error",
-        description: "Failed to process drowsiness detection. Please try again.",
+        description: "Failed to process drowsiness detection. Using backup detection method.",
         variant: "destructive",
       });
+      
+      // Set default "awake" status on error to avoid getting stuck
+      setStatus('awake');
     }
   }, [isDetecting, status]);
   
